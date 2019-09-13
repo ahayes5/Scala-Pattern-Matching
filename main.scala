@@ -13,7 +13,7 @@ case class Concat(l: Tree, r: Tree) extends Tree
 
 case class Or(l: Tree, r: Tree) extends Tree
 
-case class Letter(n: Char) extends Tree
+case class Letter(n: String) extends Tree
 
 
 class Combinators extends JavaTokenParsers
@@ -29,13 +29,14 @@ class Combinators extends JavaTokenParsers
 		{ case l ~ r => Concat(l, r) } | f
 
 	def f: Parser[Tree] = a ~ "?" ^^
-		{ case l ~ p => Opt(l) } | a
+		{ case l ~ p => Or(l, Letter("")) } | a
 
 	def a: Parser[Tree] = "(" ~ e ~ ")" ^^
 		{ case l ~ p ~ r => Par(p) } | c
 
-	def c: Parser[Tree] = "[A-Za-z0-9.]".r ^^
-		{ str => Letter(str.charAt(0)) }
+	def c: Parser[Tree] = "[A-Za-z0-9. ]".r ^^
+		{ str => Letter(str.substring(0, 1)) }
+
 
 }
 
@@ -43,135 +44,134 @@ object Main extends Combinators
 {
 
 	var index = 0
-	var matched = ""
-	var matches = true
+	//var position=0
+	//var matched = ""
+	//var matches = true
 
 	def eval1(t: Tree, str: String): Boolean =
 	{
 		index = 0
-		matched = ""
-		matches = true
-		eval(t, str)
-		if (matched.equals(str))
+		//position=0
+		//matched = ""
+		var matches = true
+
+		val a = eval(t, str)
+		//println(a)
+		if (a.equals(str))
 			matches
 		else
 			false
 	}
 
-	def eval(t: Tree, str: String): Any =
+	def eval(t: Tree, str: String): String =
 		t match
 		{
 
 			case Par(in) => eval(in, str)
 
-			case Opt(in) =>
-			{
-				val a = eval(in, str)
-		//		if ()
-
-			}
 
 			case Concat(l, r) =>
 			{
-				eval(l, str)
+
+				val a = eval(l, str)
+				if (a.equals(""))
+					index -= 1
 				index += 1
-				eval(r, str)
+				a + eval(r, str)
 			}
 
 			case Or(l, r) =>
 			{
-				val t = matches
+				val position = index
 				val a = eval(l, str)
-				if (matches)
+				val tempindex = index
+				index = position
+				val b = eval(r, str)
+
+				if ((tempindex < str.length) && a.equals(str.substring(position, tempindex + 1)))
 				{
-					true
+					index = tempindex
+					a
+				}
+				else if ((tempindex < str.length) && a.equals(str.substring(position)))
+				{
+					index = tempindex
+					a
+				}
+				else if (position>= str.length)
+					"NULL"
+				else if ((tempindex >= str.length) && a.equals(str.substring(position)))
+					a
+				else if ((index < str.length) && b.equals(str.substring(position, index + 1)))
+					b
+				else if ((index < str.length) && b.equals(str.substring(position)))
+					b
+				else if ((index >= str.length) && b.equals(str.substring(position)))
+					b
+				else if (b.equals("EMPTY"))
+					""
+				else
+					"NULL"
+
+			}
+
+			case Letter(n) =>
+			{
+				if (n.equals(""))
+				{
+					"EMPTY"
 				}
 				else
 				{
-					matches = t
-					val b = eval(r, str)
-					true
-				}
-			}
-
-			case Letter(n) =>
-			{
-				try
-				{
-					if (str.charAt(index) == n)
+					if (index < str.length)
 					{
-						matched += n.toString
-						n
+						val a = str.substring(index, index + 1)
+
+
+						if (n.equals(a))
+						{
+							//matched += n
+							n
+						}
+						else if (n.equals("."))
+							str.substring(index, index + 1)
+						else
+						{
+							//matches = false
+							"NULL"
+						}
 					}
 					else
-					{
-						matches = false
-						n
-					}
-				}
-				catch
-				{
-					case estr: java.lang.StringIndexOutOfBoundsException => matches = false; false
+						"NULL"
 				}
 			}
 
 		}
 
-	def ev(t: Tree, s: String): Boolean =
-	{
-		matches = true
-		index = 0
-		matched = ""
-		ev1(t, s)
-		matches
-	}
-
-	def ev1(t: Tree, s: String): Any =
-		t match
-		{
-			case Par(in) => ev1(in, s)
-			case Opt(in) =>
-			{
-				ev1(in,s)
-			}
-			case Concat(l, r) =>
-			{
-				ev1(l,s)
-				index+=1
-				ev1(r,s)
-			}
-			case Or(l, r) =>
-			{
-				ev1(l,s)
-			}
-			case Letter(n) =>
-			{
-				if(s.substring(index,index+1).equals(n.toString))
-					{
-						matched+=n.toString
-						n
-					}
-
-			}
-		}
 
 	override def skipWhitespace: Boolean = false
 
 	def main(args: Array[String])
 	{
+		val sc = new Scanner(System.in)
+		print("Pattern: ")
+		val pat = sc.nextLine()
 
-		println("abc".substring(1,1))
-		val exp: Tree = parseAll(s, "a|b").get
+		val exp: Tree = parseAll(s, pat).get
 
 		println(exp)
-		val sc = new Scanner(System.in)
+		print("String: ")
 		var ans = sc.nextLine()
 
 
 		while (!ans.equals("exit"))
 		{
-			var a = ev(exp, ans)
-			println(a)
+			var a = eval1(exp, ans)
+			if (a)
+				println("match")
+			else
+				println("no match")
+			print("String: ")
 			ans = sc.nextLine()
 
 		}
